@@ -467,6 +467,18 @@ public partial class App : Application
         await Client.Login(args.Slot, !string.IsNullOrWhiteSpace(args.Password) ? args.Password : null);
 
         Helpers.DigimonTechniques = ReadTechniques();
+
+#if DEBUG
+        _ = Task.Run(async () =>
+        {
+            await Helpers.WaitForJijimonIntroAsync();
+            var dumpPath = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                "dw1_ram_dump.bin");
+            Helpers.DumpPS1RAM(dumpPath);
+        }).ConfigureAwait(false);
+#endif
+
         var locations = Helpers.GetProsperityLocations();
         locations.AddRange(Helpers.GetDigimonCards());
         locations.AddRange(Helpers.GetChests());

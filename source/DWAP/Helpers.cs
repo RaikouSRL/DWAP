@@ -875,6 +875,17 @@ namespace DWAP
             }
         }
 
+        public static void DumpPS1RAM(string outputPath)
+        {
+            const int ramSize = 0x200000; // 2MB PS1 RAM
+            Log.Information($"Dumping PS1 RAM ({ramSize} bytes) to {outputPath}...");
+
+            byte[] ram = Memory.ReadByteArray(0, ramSize);
+            File.WriteAllBytes(outputPath, ram);
+
+            Log.Information($"RAM dump complete: {outputPath}");
+        }
+
         public static int GetRookieNum(int option)
         {
             switch (option)
