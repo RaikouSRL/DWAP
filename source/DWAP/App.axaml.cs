@@ -2,7 +2,7 @@
 using Archipelago.Core.AvaloniaGUI.Models;
 using Archipelago.Core.AvaloniaGUI.ViewModels;
 using Archipelago.Core.AvaloniaGUI.Views;
-using Archipelago.Core.GameClients;
+using Archipelago.Core.Helpers;
 using Archipelago.Core.Models;
 using Archipelago.Core.Util;
 using Archipelago.Core.Util.GPS;
@@ -189,7 +189,7 @@ public partial class App : Application
         {
             ExpMultiplier = Convert.ToInt32(options["exp_multiplier"].ToString());
         }
-        if (options.ContainsKey("progressive_stats"))
+        if (options.ContainsKey("progressive_stats") && Convert.ToInt32(options["progressive_stats"].ToString()) > 0)
         {
             StatCapEnabled = true;
             var boostsReceived = (Client.CurrentSession.Items.AllItemsReceived.Count(x => x.ItemName.ToLower() == "progressive stat cap"));
@@ -215,7 +215,7 @@ public partial class App : Application
         //        }
         //    }).ConfigureAwait(false);
         //}
-        if (options.ContainsKey("random_starter"))
+        if (options.ContainsKey("random_starter") && Convert.ToInt32(options["random_starter"].ToString()) > 0)
         {
             Log.Information("Writing new Starters");
             Memory.WriteByte(Addresses.Starter1, RandomSettings.Starter);
@@ -356,6 +356,7 @@ public partial class App : Application
 
     private void EnsureStatCap()
     {
+        if (!StatCapEnabled) { return; }
         var boostsReceived = (Client.CurrentSession.Items.AllItemsReceived.Count(x => x.ItemName.ToLower() == "progressive stat cap"));
         if (boostsReceived >= 9)
         {
@@ -447,7 +448,7 @@ public partial class App : Application
             Client.Connected -= OnConnected;
             Client.Disconnected -= OnDisconnected;
         }
-        DuckstationClient client = new DuckstationClient();
+        GameClient client = new GameClient("duckstation");
         var duckstationConnected = client.Connect();
         if (!duckstationConnected)
         {
@@ -467,11 +468,11 @@ public partial class App : Application
 
         Helpers.DigimonTechniques = ReadTechniques();
         var locations = Helpers.GetProsperityLocations();
-        locations.Concat(Helpers.GetDigimonCards());
-        locations.Concat(Helpers.GetChests());
-        Client.EnableLocationsCondition = ()=> Helpers.IsInGame();
+        locations.AddRange(Helpers.GetDigimonCards());
+        locations.AddRange(Helpers.GetChests());
+        Client.LocationManager.EnableLocationsCondition = ()=> Helpers.IsInGame();
 
-        Client.MonitorLocations(locations);
+        Client.LocationManager.MonitorLocationsAsync(Client.CurrentSession, locations);
         Client.GPSHandler = new Archipelago.Core.Util.GPS.GPSHandler(() => Helpers.GetCurrentLocation());
         Client.GPSHandler.PositionChanged += (o, e) =>
         {
@@ -486,10 +487,10 @@ public partial class App : Application
         {
             ConfigureOptions(Client.Options);
         }
-        Client.ItemReceived += OnItemReceived;
+        Client.ItemManager.ItemReceived += OnItemReceived;
 
         //Is game started yet?
-        if (!Client.LocationState.CompletedLocations.Any(x => x.Id == 69003000))
+        if (!Client.CurrentSession.Locations.AllLocationsChecked.Any(x => x == 69003000))
         {
             _ = Task.Run(async () =>
             {
@@ -497,7 +498,7 @@ public partial class App : Application
                 {
                     await Helpers.WaitForJijimonIntroAsync();
                     var startGameLocation = new Archipelago.Core.Models.Location() { Id = 69003000, Name = "Start Game" };
-                    Client.SendLocation(startGameLocation);
+                    Client.CurrentSession.Locations.CompleteLocationChecks(startGameLocation.Id);
                 }
                 catch (Exception ex)
                 {
@@ -518,7 +519,7 @@ public partial class App : Application
             }
             if (soulLocations.Any())
             {
-                Client.MonitorLocations(soulLocations);
+                Client.LocationManager.MonitorLocationsAsync(Client.CurrentSession, soulLocations);
             }
         }
     }
@@ -558,7 +559,7 @@ public partial class App : Application
             {
                 var soulName = item.Name.Split(" ")[0];
                 var digimonRecruit = Helpers.GetLocations().Where(x => x.Name.Contains(soulName)).ToList();
-                Client.MonitorLocations(digimonRecruit);
+                Client.LocationManager.MonitorLocationsAsync(Client.CurrentSession, digimonRecruit);
             }
         }
     }
@@ -602,7 +603,7 @@ public partial class App : Application
     {
         var newMessage = message.Parts.Select(x => x.Text);
 
-        if (Context.HintList.Any(x => x.TextSpans.Select(y => y.Text) == newMessage))
+        if (Context.HintList.Any(x => x.TextSpans.Select(y => y.Text).SequenceEqual(newMessage)))
         {
             return; //Hint already in list
         }

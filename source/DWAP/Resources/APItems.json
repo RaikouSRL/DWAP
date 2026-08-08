@@ -100,7 +100,7 @@
     "Type": 3
   },
   {
-    "Name": "Vegimon",
+    "Name": "Vegiemon",
     "Id": 691020,
     "Type": 3
   },
@@ -862,7 +862,7 @@
   {
     "Name": "Steak",
     "Id": 692122,
-    "Type": 1
+    "Type": 0
   },
   {
     "Name": "Frig Key",
@@ -897,6 +897,11 @@
   {
     "Name": "5000 Bits",
     "Id": 693002,
+    "Type": 1
+  },
+  {
+    "Name": "Progressive Stat Cap",
+    "Id": 693000,
     "Type": 1
   }
 ]

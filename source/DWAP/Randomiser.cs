@@ -25,11 +25,11 @@ namespace DWAP
             // Starter Randomisation
             if(Options.StarterRandomisation == StarterRandomisation.RookieOnly)
             {
-                Starter = (byte)Helpers.GetRookieNum(RNG.Next(0, 8));
+                Starter = (byte)Helpers.GetRookieNum(RNG.Next(0, 9));
             }
             else if(Options.StarterRandomisation == StarterRandomisation.All)
             {
-                Starter = (byte)RNG.Next(1, 65);
+                Starter = (byte)RNG.Next(1, 66);
             }
 
 

@@ -445,7 +445,7 @@ namespace DWAP
         }
         public static List<DigimonWorldItem> GetAcquiredSouls(ArchipelagoClient client)
         {
-            var list = client.ItemState.ReceivedItems.Where(x => x.Id >= 694000 && x.Id <= 694999).Select(x => x.Id).ToList();
+            var list = client.CurrentSession.Items.AllItemsReceived.Where(x => x.ItemId >= 694000 && x.ItemId <= 694999).Select(x => x.ItemId).ToList();
             if (!list.Any()) return new List<DigimonWorldItem>();
             var soulLookup = GetDigimonSouls();
             var results = soulLookup.Where(x => list.Contains(x.Id)).ToList();
@@ -454,7 +454,7 @@ namespace DWAP
         }
         public static List<DigimonWorldItem> GetMissingSouls(ArchipelagoClient client)
         {
-            var list = client.ItemState.ReceivedItems.Where(x => x.Id >= 694000 && x.Id <= 694999).Select(x => x.Id).ToList();
+            var list = client.CurrentSession.Items.AllItemsReceived.Where(x => x.ItemId >= 694000 && x.ItemId <= 694999).Select(x => x.ItemId).ToList();
             var soulLookup = GetDigimonSouls();
             var results = soulLookup.Where(x => !list.Contains(x.Id)).ToList();
             return results;
@@ -704,6 +704,8 @@ namespace DWAP
                     bit = 7;
                     break;
                 case 48:
+                    address = 0x00155806;
+                    bit = 0;
                     break;
                 case 49:
                     address = 0x00155806;
