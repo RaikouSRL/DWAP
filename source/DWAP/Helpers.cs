@@ -4,6 +4,7 @@ using Archipelago.Core.Models;
 using Archipelago.Core.Util;
 using Archipelago.Core.Util.GPS;
 using Avalonia.Controls;
+using Avalonia.Platform;
 using DWAP.Models;
 using Newtonsoft.Json;
 using Serilog;
@@ -27,25 +28,25 @@ namespace DWAP
         public static List<DigimonTechniqueData> DigimonTechniques { get; set; }
         public static List<ILocation> GetLocations()
         {
-            var json = OpenEmbeddedResource("DWAP.Resources.Locations.json");
+            var json = OpenAvaloniaResource("Locations.json");
             var list = LocationJsonHelper.Instance.DeserializeLocations(json);
             return list;
         }
         public static List<DigimonItem> GetConsumables()
         {
-            var json = OpenEmbeddedResource("DWAP.Resources.DigimonItems.json");
+            var json = OpenAvaloniaResource("DigimonItems.json");
             var list = JsonConvert.DeserializeObject<List<DigimonItem>>(json);
             return list;
         }
         public static List<ILocation> GetChests()
         {
-            var json = OpenEmbeddedResource("DWAP.Resources.Chests.json");
+            var json = OpenAvaloniaResource("Chests.json");
             var list = LocationJsonHelper.Instance.DeserializeLocations(json);
             return list;
         }
         public static List<DigimonWorldItem> GetDigimonSouls()
         {
-            var json = OpenEmbeddedResource("DWAP.Resources.DigimonSouls.json");
+            var json = OpenAvaloniaResource("DigimonSouls.json");
             var list = JsonConvert.DeserializeObject<List<DigimonWorldItem>>(json);
             foreach (var item in list)
             {
@@ -314,26 +315,25 @@ namespace DWAP
         }
         public static List<ILocation> GetDigimonCards()
         {
-            var json = OpenEmbeddedResource("DWAP.Resources.DigimonCards.json");
+            var json = OpenAvaloniaResource("DigimonCards.json");
             var list = LocationJsonHelper.Instance.DeserializeLocations(json);
             return list;
         }
         public static List<ILocation> GetProsperityLocations()
         {
-            var json = OpenEmbeddedResource("DWAP.Resources.Prosperity.json");
+            var json = OpenAvaloniaResource("Prosperity.json");
             var list = LocationJsonHelper.Instance.DeserializeLocations(json);
             return list;
         }
         public static List<DigimonWorldItem> GetAPItems()
         {
-            var json = OpenEmbeddedResource("DWAP.Resources.APItems.json");
+            var json = OpenAvaloniaResource("APItems.json");
             var list = JsonConvert.DeserializeObject<List<DigimonWorldItem>>(json);
             return list;
         }
-        public static string OpenEmbeddedResource(string resourceName)
+        public static string OpenAvaloniaResource(string resourceName)
         {
-            var assembly = Assembly.GetExecutingAssembly();
-            using (Stream stream = assembly.GetManifestResourceStream(resourceName))
+            using (Stream stream = AssetLoader.Open(new Uri($"avares://DWAP/Resources/{resourceName}")))
             using (StreamReader reader = new StreamReader(stream))
             {
                 string jsonFile = reader.ReadToEnd();

@@ -6,6 +6,7 @@ using Archipelago.Core.Helpers;
 using Archipelago.Core.Models;
 using Archipelago.Core.Util;
 using Archipelago.Core.Util.GPS;
+using Archipelago.Core.Util.PlatformMemory;
 using Archipelago.MultiClient.Net.MessageLog.Messages;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -457,7 +458,7 @@ public partial class App : Application
         }
         Client = new ArchipelagoClient(client);
 
-        Memory.GlobalOffset = Memory.GetDuckstationOffset();
+        PlatformMemory.GlobalOffset = PlatformMemory.GetDuckstationOffset();
 
         Client.Connected += OnConnected;
         Client.Disconnected += OnDisconnected;

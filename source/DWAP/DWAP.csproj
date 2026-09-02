@@ -20,30 +20,31 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Chests.json">
+    <AvaloniaResource Include="Resources\Chests.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Resources\APItems.json">
+    </AvaloniaResource>
+    <AvaloniaResource Include="Resources\APItems.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Resources\DigimonCards.json">
+    </AvaloniaResource>
+    <AvaloniaResource Include="Resources\DigimonCards.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Resources\DigimonItems.json">
+    </AvaloniaResource>
+    <AvaloniaResource Include="Resources\DigimonItems.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Resources\DigimonSouls.json">
+    </AvaloniaResource>
+    <AvaloniaResource Include="Resources\DigimonSouls.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Resources\Locations.json">
+    </AvaloniaResource>
+    <AvaloniaResource Include="Resources\Locations.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Resources\Prosperity.json">
+    </AvaloniaResource>
+    <AvaloniaResource Include="Resources\Prosperity.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
+    </AvaloniaResource>
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Archipelago.Core" Version="2.0.3" />
     <PackageReference Include="Archipelago.Core.AvaloniaGUI" Version="1.0.1" />
     <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
