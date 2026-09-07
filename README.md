@@ -6,5 +6,5 @@ Digimon World Archipelago Randomiser
 
 [Click Here](https://github.com/ArsonAssassin/Archipelago.Core/wiki/How-to-start-playing-a-game-using-this-library)
 
-# Tracker
-Seto has written a Poptracker you can use [here](https://github.com/seto10987/Digimon-World-AP-PopTracker-Pack)
+# NOTE
+Claude AI Assisted fork, Original Code is not AI Generated
