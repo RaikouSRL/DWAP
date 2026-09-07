@@ -417,6 +417,33 @@ namespace DWAP
             var currentTime = Memory.ReadLong(0x00134f00);
             return currentTime > 8;
         }
+        public static bool IsTimeRunning()
+        {
+            // Gamestate ID 0 / 0x001be031 "Timespeed": 0 = normal, 1 = 2x,
+            // 2 = 0.5x, >2 = stopped (menus, cutscenes, etc). Kept as an
+            // extra belt-and-suspenders check, but note this alone doesn't
+            // catch the character/partner naming screen - Timespeed reads
+            // 0 there too, since the whole Gamestate/Triggers region is
+            // just uninitialized until control is actually handed over.
+            var timeSpeed = Memory.ReadByte(0x001be031);
+            return timeSpeed <= 2;
+        }
+        public static bool HasGainedControl()
+        {
+            // Cards & Triggers ID 54 "Debug Mode disabled" (bit 6) and
+            // ID 55 "Intro cutscene did not play yet" (bit 7) share the
+            // same byte at 0x001bdfd3. The instant ID 54 goes true and
+            // ID 55 goes false is the exact moment the intro cutscene
+            // finishes and control (with an emptied inventory) is handed
+            // to the player - unlike Timespeed/IsInGame, this only flips
+            // once and stays flipped for the rest of the save, so it
+            // reliably distinguishes "still on the naming screen" from
+            // "actually in control".
+            var flags = Memory.ReadByte(0x001bdfd3);
+            bool debugModeDisabled = (flags & 0x40) != 0;   // bit 6
+            bool introNotPlayedYet = (flags & 0x80) != 0;   // bit 7
+            return debugModeDisabled && !introNotPlayedYet;
+        }
         public static DigimonStage GetDigimonStage(byte id)
         {
             byte[] babyIds = [1, 15, 29, 43];

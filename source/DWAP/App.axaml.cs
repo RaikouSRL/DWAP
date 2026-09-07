@@ -750,7 +750,7 @@ public partial class App : Application
         // reliable, so this polls the session's full received-items list
         // (the same underlying data EnsureSouls()/GetAcquiredSouls() already
         // use successfully) and processes anything new since last tick.
-        if (!Helpers.IsInGame())
+        if (!Helpers.IsInGame() || !Helpers.IsTimeRunning() || !Helpers.HasGainedControl())
         {
             // Defer entirely while not actually in a loaded game (e.g.
             // connected before starting/loading a save, or still in the
@@ -762,7 +762,14 @@ public partial class App : Application
             // so once it is, everything received in the meantime (from the
             // server or queued up before connecting) gets applied on the
             // very next tick.
-            Log.Debug("Not in game yet - deferring received-item processing");
+            // Also defer while Timespeed is stopped (>2), and - critically -
+            // while HasGainedControl() is false. IsInGame()/IsTimeRunning()
+            // both already read as "ready" during the character/partner
+            // naming screen (confirmed: currentTime is already >8 and
+            // Timespeed stays 0 there), so HasGainedControl() is the one
+            // that actually catches that window and holds items until the
+            // intro cutscene finishes and control is handed over.
+            Log.Debug("Not in game yet, time is stopped, or control not yet gained - deferring received-item processing");
             return;
         }
         var newItems = new List<(long ItemId, string ItemName)>();
