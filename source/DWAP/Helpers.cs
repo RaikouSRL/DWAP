@@ -1,4 +1,4 @@
-﻿using Archipelago.Core;
+using Archipelago.Core;
 using Archipelago.Core.Json;
 using Archipelago.Core.Models;
 using Archipelago.Core.Util;
@@ -467,7 +467,7 @@ namespace DWAP
             technique.AddressBit = addressData.Item2;
             return technique;
         }
-        public static int CalculateProsperityPoints()
+        public static int CalculateProsperityPoints(ArchipelagoClient client)
         {
             int result = 0;
             var rookieList = new List<string>()
@@ -484,8 +484,22 @@ namespace DWAP
                 "Piximon", "Giromon", "Andromon", "Monzaemon", "Vademon", "MetalMamemon", "SkullGreymon", "Mamemon", "MetalGreymon", "Etemon", "Megadramon", "Digitamamon"
             };
             var digimonLocations = GetLocations();
+            // A Digimon's recruit flag can read true for a brief moment right
+            // after winning the fight even when its soul item hasn't been
+            // received - the game sets it, and EnsureSouls() only reverts it
+            // on the next ~5 second poll. Sampling Check() alone can catch
+            // that window and count points (and trigger a prosperity
+            // milestone location check server-side) for a Digimon the player
+            // isn't actually supposed to have yet. Cross-check against
+            // actually-acquired souls so a transient flag read can't do that,
+            // regardless of polling timing.
+            var acquiredSoulNames = GetAcquiredSouls(client).Select(x => x.Name.Split(' ')[0]).ToHashSet();
             foreach (var digimonLocation in digimonLocations)
             {
+                if (!acquiredSoulNames.Contains(digimonLocation.Name))
+                {
+                    continue;
+                }
                 if (digimonLocation.Check())
                 {
                     if (rookieList.Contains(digimonLocation.Name))
