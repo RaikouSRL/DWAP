@@ -1,4 +1,4 @@
-﻿using Archipelago.Core;
+using Archipelago.Core;
 using Archipelago.Core.AvaloniaGUI.Models;
 using Archipelago.Core.AvaloniaGUI.ViewModels;
 using Archipelago.Core.AvaloniaGUI.Views;
@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Concurrency;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 
@@ -33,6 +34,26 @@ public partial class App : Application
     public static ArchipelagoClient Client { get; set; }
     public static PositionData CurrentLocation { get; set; }
     public static int StatCap { get; set; }
+    private static readonly Queue<int> _pendingItems = new Queue<int>();
+    private static readonly object _itemQueueLock = new object();
+    private static long _pendingMoney = 0;
+    // Archipelago.Core's ItemManager.ItemReceived event does not fire
+    // reliably (confirmed: souls are received fine via polling
+    // Client.CurrentSession.Items.AllItemsReceived, but consumables sent
+    // via the server never triggered ItemReceived). So instead of relying
+    // on that event, we poll the session's full received-items list every
+    // tick and track how far we've processed it - the same reliable
+    // approach the existing soul-handling code already uses.
+    private static int _processedItemIndex = 0;
+    private static readonly object _processedItemLock = new object();
+    // Where the processed-item count for the CURRENT seed+slot is persisted,
+    // so restarting/reconnecting doesn't replay already-applied consumables
+    // and money (that replay isn't idempotent, unlike souls/log entries).
+    private static string _itemIndexFilePath;
+    // Prosperity thresholds already sent to the server this session - see
+    // EnsureProsperity() for why these are sent manually instead of via
+    // MonitorLocationsAsync.
+    private static readonly HashSet<long> _completedProsperityLocationIds = new HashSet<long>();
     public static int ExpMultiplier { get; set; }
     public static bool StatCapEnabled { get; set; }
     public static Randomiser RandomSettings { get; set; }
@@ -90,10 +111,32 @@ public partial class App : Application
         Helpers.DigimonItems = Helpers.GetConsumables();
         Log.Information("Ready to connect!");
     }
-    private void AddDigimonItem(int id)
+    private void AddDigimonItem()
     {
-        var localId = id - 692000;
-        var consumable = Helpers.DigimonItems.First(x => x.Id == localId);
+        // Process every item currently queued, not just one, so a burst of
+        // items received between ticks doesn't overwrite/lose any of them.
+        while (true)
+        {
+            int itemId;
+            lock (_itemQueueLock)
+            {
+                if (_pendingItems.Count == 0)
+                    return;
+                itemId = _pendingItems.Dequeue();
+            }
+            AddSingleDigimonItem(itemId);
+        }
+    }
+
+    private void AddSingleDigimonItem(int itemId)
+    {
+        var localId = itemId - 692000;
+        var consumable = Helpers.DigimonItems.FirstOrDefault(x => x.Id == localId);
+        if (consumable == null)
+        {
+            Log.Warning($"Received unknown consumable item id {itemId} (localId {localId}) - ignoring");
+            return;
+        }
         var inventorySize = (int)Memory.ReadByte(Addresses.InventorySize);
         //Get matching item pile in inventory
         for (int i = 0; i < 10; i++)
@@ -144,13 +187,20 @@ public partial class App : Application
         }
         return null;
     }
-    private void AddMoney(int amount)
+    private void AddMoney()
     {
-        var currentCash = Memory.ReadInt(Addresses.CurrentBits);
-        var newCash = currentCash + amount;
-        Memory.Write(Addresses.CurrentBits, newCash);
+        // Atomically grab and clear the accumulated pending money so that
+        // any money items received concurrently (between reading and
+        // resetting) aren't lost.
+        var amount = Interlocked.Exchange(ref _pendingMoney, 0);
+        if (amount != 0)
+        {
+            var currentCash = Memory.ReadInt(Addresses.CurrentBits);
+            var newCash = currentCash + (int)amount;
+            Memory.Write(Addresses.CurrentBits, newCash);
+        }
     }
-    private async void ConfigureOptions(Dictionary<string, object> options)
+    private async Task ConfigureOptions(Dictionary<string, object> options)
     {
         int randomSeed = 0;
         foreach (char c in Client.CurrentSession.RoomState.Seed)
@@ -234,7 +284,7 @@ public partial class App : Application
                     }
                     catch (Exception ex)
                     {
-                        Log.Logger.Error(ex.Message);
+                        LogException("WriteStarterMove", ex);
                     }
                 }).ConfigureAwait(false);
             }
@@ -388,26 +438,86 @@ public partial class App : Application
     }
     private void TimerTick(object? sender, ElapsedEventArgs e)
     {
-        if (ExpMultiplier > 1)
+        // Guard the whole tick: an unhandled exception thrown from a
+        // System.Timers.Timer callback can silently stop the timer (or
+        // crash the process), which would stop all item/money/location
+        // processing for the rest of the session. Each step is wrapped
+        // individually (via RunStep) so one failing step doesn't prevent
+        // the others from running this tick, and so the log tells us
+        // exactly which step failed instead of just "something in
+        // TimerTick threw".
+        try
         {
-            SetExpMultiplier(ExpMultiplier);
-        }
-        CurrentLocation = Helpers.GetCurrentLocation();
-        EnsureStatCap();
-        EnsureSouls();
-        EnsureWorldFlags();
-        EnsureProsperity();
+            Log.Debug("TimerTick fired");
+            if (ExpMultiplier > 1)
+            {
+                RunStep("SetExpMultiplier", () => SetExpMultiplier(ExpMultiplier));
+            }
+            CurrentLocation = Helpers.GetCurrentLocation();
+            RunStep("EnsureStatCap", EnsureStatCap);
+            RunStep("EnsureSouls", EnsureSouls);
+            RunStep("EnsureWorldFlags", EnsureWorldFlags);
+            RunStep("EnsureProsperity", EnsureProsperity);
+            RunStep("ProcessReceivedItems", ProcessReceivedItems);
+            RunStep("AddMoney", AddMoney);
+            RunStep("AddDigimonItem", AddDigimonItem);
 
-        if (goalLocation?.Check() ?? false)
-        {
-            Client.SendGoalCompletion();
+            if (goalLocation?.Check() ?? false)
+            {
+                Client.SendGoalCompletion();
+            }
         }
+        catch (Exception ex)
+        {
+            LogException("TimerTick", ex);
+        }
+    }
+
+    private void RunStep(string stepName, Action step)
+    {
+        try
+        {
+            step();
+        }
+        catch (Exception ex)
+        {
+            LogException(stepName, ex);
+        }
+    }
+
+    private static void LogException(string context, Exception ex)
+    {
+        // Bake the exception type/message/stack trace directly into the log
+        // message text (rather than relying on Serilog's {Exception} token
+        // in the sink's output template) so the detail can't get dropped or
+        // truncated by whatever is rendering/viewing the log.
+        Log.Logger.Error(
+            "Unhandled exception in {Context}: {ExceptionType}: {ExceptionMessage}\n{StackTrace}",
+            context, ex.GetType().FullName, ex.Message, ex.StackTrace);
     }
 
     private void EnsureProsperity()
     {
-        var prosperity = Helpers.CalculateProsperityPoints();
+        var prosperity = Helpers.CalculateProsperityPoints(Client);
         Memory.Write(Addresses.ProsperityPoints, prosperity);
+
+        // Send prosperity milestone checks ourselves, using only the
+        // soul-gated value just computed above - see the comment where
+        // GetProsperityLocations() is built (in Connect()) for why these are
+        // deliberately NOT handed to MonitorLocationsAsync.
+        foreach (var location in Helpers.GetProsperityLocations())
+        {
+            if (_completedProsperityLocationIds.Contains(location.Id))
+                continue;
+            var namePrefix = location.Name?.Split(' ')[0];
+            if (!int.TryParse(namePrefix, out var threshold))
+                continue;
+            if (prosperity >= threshold)
+            {
+                Client.CurrentSession.Locations.CompleteLocationChecks(location.Id);
+                _completedProsperityLocationIds.Add(location.Id);
+            }
+        }
     }
 
     private void EnsureWorldFlags()
@@ -448,6 +558,7 @@ public partial class App : Application
         {
             Client.Connected -= OnConnected;
             Client.Disconnected -= OnDisconnected;
+            Client.MessageReceived -= Client_MessageReceived;
         }
         GameClient client = new GameClient("duckstation");
         var duckstationConnected = client.Connect();
@@ -462,10 +573,34 @@ public partial class App : Application
 
         Client.Connected += OnConnected;
         Client.Disconnected += OnDisconnected;
+        // This was defined (Client_MessageReceived/LogHint below) but never
+        // actually subscribed anywhere, so hint messages never reached the
+        // Hints tab.
+        Client.MessageReceived += Client_MessageReceived;
 
         await Client.Connect(args.Host, "Digimon World");
+        Log.Information("Connected to Archipelago server, logging in...");
 
         await Client.Login(args.Slot, !string.IsNullOrWhiteSpace(args.Password) ? args.Password : null);
+        Log.Information("Login successful, continuing setup...");
+
+        // Load how many items we've already applied for THIS seed+slot from
+        // disk, rather than starting at 0 - otherwise every restart/reconnect
+        // would replay the full received-items history and duplicate
+        // consumables/money that were already added on a previous run.
+        lock (_processedItemLock)
+        {
+            _itemIndexFilePath = BuildItemIndexFilePath(args.Host, Client.CurrentSession.RoomState.Seed, args.Slot);
+            _processedItemIndex = LoadProcessedItemIndex(_itemIndexFilePath);
+        }
+        Log.Information($"Resuming item processing at index {_processedItemIndex}");
+
+        // Reset per-connection dedupe state - stale entries from a
+        // different seed/slot connected to earlier in the same app run
+        // could otherwise suppress legitimate prosperity completions here.
+        // Resending an already-completed location is harmless (the server
+        // just ignores it), so starting empty each connect is safe.
+        _completedProsperityLocationIds.Clear();
 
         Helpers.DigimonTechniques = ReadTechniques();
 
@@ -480,9 +615,18 @@ public partial class App : Application
         }).ConfigureAwait(false);
 #endif
 
-        var locations = Helpers.GetProsperityLocations();
-        locations.AddRange(Helpers.GetDigimonCards());
+        var locations = Helpers.GetDigimonCards();
         locations.AddRange(Helpers.GetChests());
+        // Prosperity locations are deliberately NOT included here. Their
+        // Check() reads Addresses.ProsperityPoints directly, and the native
+        // game writes to that address immediately and unconditionally the
+        // instant ANY Digimon is recruited - including ones whose soul the
+        // player doesn't own, where the recruit is supposed to not count.
+        // MonitorLocationsAsync polls far faster than our EnsureProsperity()
+        // correction cycle, so it can catch that raw, un-gated write and
+        // send a false completion before we ever overwrite it with the
+        // correct value. Instead, EnsureProsperity() below sends prosperity
+        // checks itself, driven only by our soul-gated calculation.
         Client.LocationManager.EnableLocationsCondition = ()=> Helpers.IsInGame();
 
         Client.LocationManager.MonitorLocationsAsync(Client.CurrentSession, locations);
@@ -496,11 +640,13 @@ public partial class App : Application
             Log.Debug($"Map Changed: {Client.GPSHandler.Region}: {e.NewMapName}");
         };
         _timer1.Start();
+        Log.Information("Timer started");
         if (Client.Options != null)
         {
-            ConfigureOptions(Client.Options);
+            await ConfigureOptions(Client.Options);
         }
         Client.ItemManager.ItemReceived += OnItemReceived;
+        Log.Information("Subscribed to ItemReceived - ready to receive items");
 
         //Is game started yet?
         if (!Client.CurrentSession.Locations.AllLocationsChecked.Any(x => x == 69003000))
@@ -515,7 +661,7 @@ public partial class App : Application
                 }
                 catch (Exception ex)
                 {
-                    Log.Logger.Error(ex.Message);
+                    LogException("StartGameLocationCheck", ex);
                 }
             }).ConfigureAwait(false);
         }
@@ -537,23 +683,158 @@ public partial class App : Application
         }
     }
 
-    private void OnItemReceived(object? sender, ItemReceivedEventArgs args)
+    private static string BuildItemIndexFilePath(string host, string seed, string slot)
     {
-        Log.Information($"Item Received: {JsonConvert.SerializeObject(args.Item)}");
-        if (Helpers.APItems.Any(x => x.Id == args.Item.Id))
+        if (string.IsNullOrEmpty(seed))
         {
-            var item = Helpers.APItems.First(x => x.Id == args.Item.Id);
+            // Silently falling back to a generic name here is exactly what
+            // caused two different sessions to collide on the same index
+            // file previously - make it loud instead.
+            Log.Logger.Warning("Room seed was empty/null when building the item-index file path - including host+slot only, which is a weaker uniqueness guarantee than seed+slot.");
+        }
+        var safeHost = SanitizeForFileName(host);
+        var safeSeed = SanitizeForFileName(seed);
+        var safeSlot = SanitizeForFileName(slot);
+        var dir = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "DWAP", "itemindex");
+        System.IO.Directory.CreateDirectory(dir);
+        var path = System.IO.Path.Combine(dir, $"{safeHost}_{safeSeed}_{safeSlot}.txt");
+        Log.Logger.Information($"Item-index file for this session: {path} (host='{host}', seed='{seed}', slot='{slot}')");
+        return path;
+    }
+
+    private static string SanitizeForFileName(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return "unknown";
+        var invalid = System.IO.Path.GetInvalidFileNameChars();
+        var chars = value.Select(c => invalid.Contains(c) ? '_' : c).ToArray();
+        return new string(chars);
+    }
+
+    private static int LoadProcessedItemIndex(string path)
+    {
+        try
+        {
+            if (System.IO.File.Exists(path) && int.TryParse(System.IO.File.ReadAllText(path).Trim(), out var index))
+            {
+                return index;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Warning("Failed to read processed-item index from {Path}, starting from 0: {ExceptionType}: {ExceptionMessage}", path, ex.GetType().FullName, ex.Message);
+        }
+        return 0;
+    }
+
+    private static void SaveProcessedItemIndex(string path, int index)
+    {
+        if (string.IsNullOrEmpty(path))
+            return;
+        try
+        {
+            System.IO.File.WriteAllText(path, index.ToString());
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Warning("Failed to persist processed-item index to {Path}: {ExceptionType}: {ExceptionMessage}", path, ex.GetType().FullName, ex.Message);
+        }
+    }
+
+    private void ProcessReceivedItems()
+    {
+        // See the field comment above: ItemManager.ItemReceived is not
+        // reliable, so this polls the session's full received-items list
+        // (the same underlying data EnsureSouls()/GetAcquiredSouls() already
+        // use successfully) and processes anything new since last tick.
+        if (!Helpers.IsInGame())
+        {
+            // Defer entirely while not actually in a loaded game (e.g.
+            // connected before starting/loading a save, or still in the
+            // opening cutscenes) - memory addresses for inventory/cash
+            // aren't valid yet, so writing to them here would silently do
+            // nothing useful while still advancing the processed-item
+            // index, permanently losing whatever was received during that
+            // window. Nothing is marked processed until IsInGame() is true,
+            // so once it is, everything received in the meantime (from the
+            // server or queued up before connecting) gets applied on the
+            // very next tick.
+            Log.Debug("Not in game yet - deferring received-item processing");
+            return;
+        }
+        var newItems = new List<(long ItemId, string ItemName)>();
+        int totalCount;
+        lock (_processedItemLock)
+        {
+            var allItems = Client.CurrentSession.Items.AllItemsReceived;
+            totalCount = allItems.Count();
+            Log.Debug($"ProcessReceivedItems: processedIndex={_processedItemIndex}, totalCount={totalCount}");
+            if (_processedItemIndex > totalCount)
+            {
+                // The loaded index is higher than this session actually has
+                // - it belongs to a different seed/slot than the one we're
+                // connected to right now (a persisted-file collision, e.g.
+                // from a seed that couldn't be read and fell back to a
+                // shared name). An index greater than the real count can
+                // never be valid, so reset rather than staying stuck
+                // permanently skipping every item forever.
+                Log.Warning($"Processed-item index ({_processedItemIndex}) exceeds this session's item count ({totalCount}) - resetting to 0. This usually means the saved index file didn't match this seed/slot.");
+                _processedItemIndex = 0;
+            }
+            if (_processedItemIndex >= totalCount)
+                return;
+            foreach (var received in allItems.Skip(_processedItemIndex))
+            {
+                if (received != null)
+                {
+                    newItems.Add((received.ItemId, received.ItemName));
+                }
+            }
+        }
+
+        foreach (var received in newItems)
+        {
+            HandleReceivedItem(received.ItemId, received.ItemName);
+        }
+
+        // Only advance/persist the cursor AFTER the items above have been
+        // successfully applied - if the app crashed mid-loop, we'd rather
+        // reprocess an item on next launch (harmless for souls/log entries,
+        // and at worst gives one duplicate consumable) than mark items as
+        // "done" that never actually got written to game memory.
+        lock (_processedItemLock)
+        {
+            _processedItemIndex = totalCount;
+        }
+        SaveProcessedItemIndex(_itemIndexFilePath, totalCount);
+    }
+
+    private void HandleReceivedItem(long itemId, string itemName)
+    {
+        Log.Information($"Processing received item: {itemName} ({itemId})");
+        // LogItem() populates the Received Items tab - it existed already
+        // but was never actually called from anywhere, so the tab always
+        // stayed empty regardless of what was received.
+        LogItem(new Item() { Id = (int)itemId, Name = itemName });
+        if (Helpers.APItems.Any(x => x.Id == itemId))
+        {
+            var item = Helpers.APItems.First(x => x.Id == itemId);
             if (item.Type == ItemType.Consumable || item.Type == ItemType.DV)
             {
-                AddDigimonItem(item.Id);
+                lock (_itemQueueLock)
+                {
+                    _pendingItems.Enqueue(item.Id);
+                }
             }
             else if (item.Name == "1000 Bits")
             {
-                AddMoney(1000);
+                Interlocked.Add(ref _pendingMoney, 1000);
             }
             else if (item.Name == "5000 Bits")
             {
-                AddMoney(5000);
+                Interlocked.Add(ref _pendingMoney, 5000);
             }
             else if (item.Name == "Progressive Stat Cap")
             {
@@ -565,9 +846,9 @@ public partial class App : Application
                 else StatCap = (boostsReceived * 100) + 100;
             }
         }
-        else if (Helpers.DigimonSouls.Any(x => x.Id == args.Item.Id))
+        else if (Helpers.DigimonSouls.Any(x => x.Id == itemId))
         {
-            var item = Helpers.DigimonSouls.First(x => x.Id == args.Item.Id);
+            var item = Helpers.DigimonSouls.First(x => x.Id == itemId);
             if (item.Type == ItemType.Soul)
             {
                 var soulName = item.Name.Split(" ")[0];
@@ -576,11 +857,28 @@ public partial class App : Application
             }
         }
     }
+
+    private void OnItemReceived(object? sender, ItemReceivedEventArgs args)
+    {
+        // Kept subscribed only for diagnostic visibility - ItemManager's
+        // event has proven unreliable (see field comment above), so all
+        // actual item handling now happens via ProcessReceivedItems()
+        // polling instead. Do not add state-changing logic back in here
+        // without also removing it from HandleReceivedItem, or items will
+        // get double-applied on the occasions this event does fire.
+        Log.Information($"ItemManager.ItemReceived fired: {JsonConvert.SerializeObject(args.Item)}");
+    }
     private void Context_ConnectClicked(object? sender, ConnectClickedEventArgs e)
     {
         if (Client == null || !(Client?.IsConnected ?? false))
         {
-            Connect(e).ConfigureAwait(false);
+            // Connect() is async and was previously fired-and-forgotten with
+            // ConfigureAwait(false) and no error handling: any exception
+            // partway through setup (before the timer is started and
+            // ItemReceived is subscribed, near the end of Connect()) was
+            // silently swallowed - items/locations would then never work,
+            // with no indication anything had gone wrong.
+            _ = ConnectSafely(e);
         }
         else if (Client != null)
         {
@@ -588,17 +886,36 @@ public partial class App : Application
             Client.Disconnect();
         }
     }
+
+    private async Task ConnectSafely(ConnectClickedEventArgs e)
+    {
+        try
+        {
+            await Connect(e);
+        }
+        catch (Exception ex)
+        {
+            LogException("ConnectSafely", ex);
+        }
+    }
     private static void LogItem(Item item)
     {
-        var messageToLog = new LogListItem(new List<TextSpan>()
-            {
-                new TextSpan(){Text = $"[{item.Id.ToString()}] -", TextColor = new SolidColorBrush(Color.FromRgb(255, 255, 255))},
-                new TextSpan(){Text = $"{item.Name}", TextColor = new SolidColorBrush(Color.FromRgb(200, 255, 200))},
-            });
+        // SolidColorBrush is an Avalonia UI object (Animatable ->
+        // AvaloniaObject) and can only be constructed on the UI thread.
+        // This is now called from TimerTick's background timer thread via
+        // ProcessReceivedItems/HandleReceivedItem, so the brushes (and the
+        // TextSpans/LogListItem that hold them) must be built INSIDE the
+        // scheduled callback below, not before it - building them here on
+        // the calling thread throws "Call from invalid thread".
         lock (_lockObject)
         {
             RxApp.MainThreadScheduler.Schedule(() =>
             {
+                var messageToLog = new LogListItem(new List<TextSpan>()
+                    {
+                        new TextSpan(){Text = $"[{item.Id.ToString()}] -", TextColor = new SolidColorBrush(Color.FromRgb(255, 255, 255))},
+                        new TextSpan(){Text = $"{item.Name}", TextColor = new SolidColorBrush(Color.FromRgb(200, 255, 200))},
+                    });
                 Context.ItemList.Add(messageToLog);
             });
         }
@@ -620,15 +937,17 @@ public partial class App : Application
         {
             return; //Hint already in list
         }
-        List<TextSpan> spans = new List<TextSpan>();
-        foreach (var part in message.Parts)
-        {
-            spans.Add(new TextSpan() { Text = part.Text, TextColor = new SolidColorBrush(Color.FromRgb(part.Color.R, part.Color.G, part.Color.B)) });
-        }
+        // Same threading issue as LogItem above - build the SolidColorBrush
+        // objects inside the scheduled UI-thread callback, not before it.
         lock (_lockObject)
         {
             RxApp.MainThreadScheduler.Schedule(() =>
             {
+                List<TextSpan> spans = new List<TextSpan>();
+                foreach (var part in message.Parts)
+                {
+                    spans.Add(new TextSpan() { Text = part.Text, TextColor = new SolidColorBrush(Color.FromRgb(part.Color.R, part.Color.G, part.Color.B)) });
+                }
                 Context.HintList.Add(new LogListItem(spans));
             });
         }
