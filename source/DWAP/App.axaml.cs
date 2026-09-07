@@ -593,7 +593,7 @@ public partial class App : Application
             _itemIndexFilePath = BuildItemIndexFilePath(args.Host, Client.CurrentSession.RoomState.Seed, args.Slot);
             _processedItemIndex = LoadProcessedItemIndex(_itemIndexFilePath);
         }
-        Log.Information($"Resuming item processing at index {_processedItemIndex}");
+        Log.Debug($"Resuming item processing at index {_processedItemIndex}");
 
         // Reset per-connection dedupe state - stale entries from a
         // different seed/slot connected to earlier in the same app run
@@ -647,7 +647,7 @@ public partial class App : Application
             await ConfigureOptions(Client.Options);
         }
         Client.ItemManager.ItemReceived += OnItemReceived;
-        Log.Information("Subscribed to ItemReceived - ready to receive items");
+        Log.Debug("Subscribed to ItemReceived - ready to receive items");
 
         //Is game started yet?
         if (!Client.CurrentSession.Locations.AllLocationsChecked.Any(x => x == 69003000))
@@ -821,7 +821,7 @@ public partial class App : Application
 
     private void HandleReceivedItem(long itemId, string itemName)
     {
-        Log.Information($"Processing received item: {itemName} ({itemId})");
+        Log.Debug($"Processing received item: {itemName} ({itemId})");
         // LogItem() populates the Received Items tab - it existed already
         // but was never actually called from anywhere, so the tab always
         // stayed empty regardless of what was received.
@@ -874,7 +874,7 @@ public partial class App : Application
         // polling instead. Do not add state-changing logic back in here
         // without also removing it from HandleReceivedItem, or items will
         // get double-applied on the occasions this event does fire.
-        Log.Information($"ItemManager.ItemReceived fired: {JsonConvert.SerializeObject(args.Item)}");
+        Log.Debug($"ItemManager.ItemReceived fired: {JsonConvert.SerializeObject(args.Item)}");
     }
     private void Context_ConnectClicked(object? sender, ConnectClickedEventArgs e)
     {
@@ -935,7 +935,14 @@ public partial class App : Application
         {
             LogHint(e.Message);
         }
-        Log.Information(JsonConvert.SerializeObject(e.Message));
+        // Server broadcasts (item sends, chat, etc.) only ever get logged
+        // here - there's no separate UI list for them like there is for
+        // locally-received items (LogItem/Context.ItemList) - so this needs
+        // to stay readable at Information, e.g. "Digimon World found their
+        // DigiTrout". The full raw payload is still available at Debug.
+        var readableMessage = string.Join("", e.Message.Parts.Select(x => x.Text));
+        Log.Information(readableMessage);
+        Log.Debug(JsonConvert.SerializeObject(e.Message));
     }
     private static void LogHint(LogMessage message)
     {
