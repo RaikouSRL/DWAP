@@ -12,6 +12,7 @@ class DigimonWorldLocationCategory(IntEnum):
     PROSPERITY = 4,
     CARD = 5,
     CHEST = 6,
+    DEFEATED = 7,
 
 
 class DigimonWorldLocationData(NamedTuple):
@@ -46,7 +47,7 @@ class DigimonWorldLocation(Location):
 
         table_order = [
             "Consumable", "Misc", "Cards", "Start Game", "Prosperity",
-            "Digimon", "Chests"
+            "Digimon", "Chests", "Wild Digimon"
         ]
 
         output = {}
@@ -360,7 +361,57 @@ location_tables = {
         DigimonWorldLocationData(69001062, "Chest 63", "1000 Bits", DigimonWorldLocationCategory.CHEST),
         DigimonWorldLocationData(69001063, "Chest 64", "1000 Bits", DigimonWorldLocationCategory.CHEST),
         DigimonWorldLocationData(69001064, "Chest 65", "1000 Bits", DigimonWorldLocationCategory.CHEST),
-    ]
+    ],
+    "Wild Digimon": [
+        DigimonWorldLocationData(69060000, "Yanmamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060001, "Gotsumon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060002, "Flarerizamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060003, "WaruMonzaemon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060004, "SnowAgumon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060005, "Hyogamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060006, "PlatinumSukamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060007, "Dokunemon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060008, "ShimaUnimon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060009, "Tankmon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060010, "RedVegiemon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060011, "J-Mojyamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060012, "NiseDrimogemon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060013, "Goburimon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060014, "MudFrigimon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060015, "Psychemon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060016, "ModokiBetamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060017, "ToyAgumon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060018, "Piddomon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060019, "Aruraumon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060020, "Geremon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060021, "Vermilimon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060022, "Fugamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060023, "Tekkamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060024, "MoriShellmon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060025, "Guardromon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060026, "Muchomon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060027, "Icemon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060028, "Akatorimon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060029, "Tsukaimon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060030, "Sharmamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060031, "ClearAgumon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060032, "Weedmon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060033, "IceDevimon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060034, "Darkrizamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060035, "SandYanmamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060036, "SnowGoburimon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060037, "BlueMeramon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060038, "Gururumon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060039, "Saberdramon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060040, "Soulmon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060041, "Rockmon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060042, "Otamamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060044, "Tentomon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060045, "WaruSeadramon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060047, "Ogremon #1", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060048, "Ogremon #2", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060046, "Meteormon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+    ],
 }
 location_dictionary: Dict[str, DigimonWorldLocationData] = {}
 for location_table in location_tables.values():

@@ -325,6 +325,12 @@ namespace DWAP
             var list = LocationJsonHelper.Instance.DeserializeLocations(json);
             return list;
         }
+        public static List<ILocation> GetWildDigimonLocations()
+        {
+            var json = OpenAvaloniaResource("WildDigimon.json");
+            var list = LocationJsonHelper.Instance.DeserializeLocations(json);
+            return list;
+        }
         public static List<DigimonWorldItem> GetAPItems()
         {
             var json = OpenAvaloniaResource("APItems.json");

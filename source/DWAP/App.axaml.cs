@@ -617,6 +617,7 @@ public partial class App : Application
 
         var locations = Helpers.GetDigimonCards();
         locations.AddRange(Helpers.GetChests());
+        locations.AddRange(Helpers.GetWildDigimonLocations());
         // Prosperity locations are deliberately NOT included here. Their
         // Check() reads Addresses.ProsperityPoints directly, and the native
         // game writes to that address immediately and unconditionally the

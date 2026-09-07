@@ -17,6 +17,7 @@
     <None Remove="Resources\DigimonSouls.json" />
     <None Remove="Resources\Locations.json" />
     <None Remove="Resources\Prosperity.json" />
+    <None Remove="Resources\WildDigimon.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,6 +40,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </AvaloniaResource>
     <AvaloniaResource Include="Resources\Prosperity.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </AvaloniaResource>
+    <AvaloniaResource Include="Resources\WildDigimon.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </AvaloniaResource>
   </ItemGroup>

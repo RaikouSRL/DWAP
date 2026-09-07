@@ -1,0 +1,337 @@
+[
+  {
+    "Name": "Yanmamon",
+    "Id": 69060000,
+    "Address": "0x001bdfee",
+    "AddressBit": 3
+  },
+
+  {
+    "Name": "Gotsumon",
+    "Id": 69060001,
+    "Address": "0x001bdfee",
+    "AddressBit": 4
+  },
+
+  {
+    "Name": "Flarerizamon",
+    "Id": 69060002,
+    "Address": "0x001bdfee",
+    "AddressBit": 5
+  },
+
+  {
+    "Name": "WaruMonzaemon",
+    "Id": 69060003,
+    "Address": "0x001bdfee",
+    "AddressBit": 6
+  },
+
+  {
+    "Name": "SnowAgumon",
+    "Id": 69060004,
+    "Address": "0x001bdfee",
+    "AddressBit": 7
+  },
+
+  {
+    "Name": "Hyogamon",
+    "Id": 69060005,
+    "Address": "0x001bdfef",
+    "AddressBit": 0
+  },
+
+  {
+    "Name": "PlatinumSukamon",
+    "Id": 69060006,
+    "Address": "0x001bdfef",
+    "AddressBit": 1
+  },
+
+  {
+    "Name": "Dokunemon",
+    "Id": 69060007,
+    "Address": "0x001bdfef",
+    "AddressBit": 2
+  },
+
+  {
+    "Name": "ShimaUnimon",
+    "Id": 69060008,
+    "Address": "0x001bdfef",
+    "AddressBit": 3
+  },
+
+  {
+    "Name": "Tankmon",
+    "Id": 69060009,
+    "Address": "0x001bdfef",
+    "AddressBit": 4
+  },
+
+  {
+    "Name": "RedVegiemon",
+    "Id": 69060010,
+    "Address": "0x001bdfef",
+    "AddressBit": 5
+  },
+
+  {
+    "Name": "J-Mojyamon",
+    "Id": 69060011,
+    "Address": "0x001bdfef",
+    "AddressBit": 6
+  },
+
+  {
+    "Name": "NiseDrimogemon",
+    "Id": 69060012,
+    "Address": "0x001bdfef",
+    "AddressBit": 7
+  },
+
+  {
+    "Name": "Goburimon",
+    "Id": 69060013,
+    "Address": "0x001bdff0",
+    "AddressBit": 0
+  },
+
+  {
+    "Name": "MudFrigimon",
+    "Id": 69060014,
+    "Address": "0x001bdff0",
+    "AddressBit": 1
+  },
+
+  {
+    "Name": "Psychemon",
+    "Id": 69060015,
+    "Address": "0x001bdff0",
+    "AddressBit": 2
+  },
+
+  {
+    "Name": "ModokiBetamon",
+    "Id": 69060016,
+    "Address": "0x001bdff0",
+    "AddressBit": 3
+  },
+
+  {
+    "Name": "ToyAgumon",
+    "Id": 69060017,
+    "Address": "0x001bdff0",
+    "AddressBit": 4
+  },
+
+  {
+    "Name": "Piddomon",
+    "Id": 69060018,
+    "Address": "0x001bdff0",
+    "AddressBit": 5
+  },
+
+  {
+    "Name": "Aruraumon",
+    "Id": 69060019,
+    "Address": "0x001bdff0",
+    "AddressBit": 6
+  },
+
+  {
+    "Name": "Geremon",
+    "Id": 69060020,
+    "Address": "0x001bdff0",
+    "AddressBit": 7
+  },
+
+  {
+    "Name": "Vermilimon",
+    "Id": 69060021,
+    "Address": "0x001bdff1",
+    "AddressBit": 0
+  },
+
+  {
+    "Name": "Fugamon",
+    "Id": 69060022,
+    "Address": "0x001bdff1",
+    "AddressBit": 1
+  },
+
+  {
+    "Name": "Tekkamon",
+    "Id": 69060023,
+    "Address": "0x001bdff1",
+    "AddressBit": 2
+  },
+
+  {
+    "Name": "MoriShellmon",
+    "Id": 69060024,
+    "Address": "0x001bdff1",
+    "AddressBit": 3
+  },
+
+  {
+    "Name": "Guardromon",
+    "Id": 69060025,
+    "Address": "0x001bdff1",
+    "AddressBit": 4
+  },
+
+  {
+    "Name": "Muchomon",
+    "Id": 69060026,
+    "Address": "0x001bdff1",
+    "AddressBit": 5
+  },
+
+  {
+    "Name": "Icemon",
+    "Id": 69060027,
+    "Address": "0x001bdff1",
+    "AddressBit": 6
+  },
+
+  {
+    "Name": "Akatorimon",
+    "Id": 69060028,
+    "Address": "0x001bdff1",
+    "AddressBit": 7
+  },
+
+  {
+    "Name": "Tsukaimon",
+    "Id": 69060029,
+    "Address": "0x001bdff2",
+    "AddressBit": 0
+  },
+
+  {
+    "Name": "Sharmamon",
+    "Id": 69060030,
+    "Address": "0x001bdff2",
+    "AddressBit": 1
+  },
+
+  {
+    "Name": "ClearAgumon",
+    "Id": 69060031,
+    "Address": "0x001bdff2",
+    "AddressBit": 2
+  },
+
+  {
+    "Name": "Weedmon",
+    "Id": 69060032,
+    "Address": "0x001bdff2",
+    "AddressBit": 3
+  },
+
+  {
+    "Name": "IceDevimon",
+    "Id": 69060033,
+    "Address": "0x001bdff2",
+    "AddressBit": 4
+  },
+
+  {
+    "Name": "Darkrizamon",
+    "Id": 69060034,
+    "Address": "0x001bdff2",
+    "AddressBit": 5
+  },
+
+  {
+    "Name": "SandYanmamon",
+    "Id": 69060035,
+    "Address": "0x001bdff2",
+    "AddressBit": 6
+  },
+
+  {
+    "Name": "SnowGoburimon",
+    "Id": 69060036,
+    "Address": "0x001bdff2",
+    "AddressBit": 7
+  },
+
+  {
+    "Name": "BlueMeramon",
+    "Id": 69060037,
+    "Address": "0x001bdff3",
+    "AddressBit": 0
+  },
+
+  {
+    "Name": "Gururumon",
+    "Id": 69060038,
+    "Address": "0x001bdff3",
+    "AddressBit": 1
+  },
+
+  {
+    "Name": "Saberdramon",
+    "Id": 69060039,
+    "Address": "0x001bdff3",
+    "AddressBit": 2
+  },
+
+  {
+    "Name": "Soulmon",
+    "Id": 69060040,
+    "Address": "0x001bdff3",
+    "AddressBit": 3
+  },
+
+  {
+    "Name": "Rockmon",
+    "Id": 69060041,
+    "Address": "0x001bdff3",
+    "AddressBit": 4
+  },
+
+  {
+    "Name": "Otamamon",
+    "Id": 69060042,
+    "Address": "0x001bdff3",
+    "AddressBit": 5
+  },
+
+  {
+    "Name": "Tentomon",
+    "Id": 69060044,
+    "Address": "0x001bdff3",
+    "AddressBit": 7
+  },
+
+  {
+    "Name": "WaruSeadramon",
+    "Id": 69060045,
+    "Address": "0x001bdfdf",
+    "AddressBit": 6
+  },
+
+  {
+    "Name": "Meteormon",
+    "Id": 69060046,
+    "Address": "0x001bdff4",
+    "AddressBit": 1
+  },
+
+  {
+    "Name": "Ogremon #1",
+    "Id": 69060047,
+    "Address": "0x001bdfe5",
+    "AddressBit": 6
+  },
+
+  {
+    "Name": "Ogremon #2",
+    "Id": 69060048,
+    "Address": "0x001bdfe2",
+    "AddressBit": 7
+  }
+]

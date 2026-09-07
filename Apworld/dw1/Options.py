@@ -46,6 +46,18 @@ class EasyMonochromonOption(DefaultOnToggle):
 class FastDrimogemonOption(DefaultOnToggle):
     """Makes Drimogen dig in 1 day instead of 10"""
     display_name = "Fast Drimogemon"
+
+class IncludeWildDigimonOption(DefaultOnToggle):
+    """Includes Wild Digimon encounters (beating specific wild/glitch Digimon) as checks"""
+    display_name = "Include Wild Digimon Encounters"
+
+class CardSanityOption(DefaultOnToggle):
+    """Includes obtaining Digimon Cards as checks"""
+    display_name = "Card Sanity"
+
+class ChestSanityOption(DefaultOnToggle):
+    """Includes opening Chests as checks"""
+    display_name = "Chest Sanity"
     
 class RandomStarterOption(Choice):
     """Randomise the 2 starter digimon options
@@ -79,3 +91,6 @@ class DigimonWorldOption(PerGameCommonOptions):
     random_techniques: RandomTechniqueOption
     fast_drimogemon: FastDrimogemonOption
     easy_monochromon: EasyMonochromonOption
+    include_wild_digimon: IncludeWildDigimonOption
+    card_sanity: CardSanityOption
+    chest_sanity: ChestSanityOption

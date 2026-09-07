@@ -61,8 +61,12 @@ class DigimonWorldWorld(World):
         self.enabled_location_categories.add(DigimonWorldLocationCategory.MISC)
         self.enabled_location_categories.add(DigimonWorldLocationCategory.EVENT)
         self.enabled_location_categories.add(DigimonWorldLocationCategory.RECRUIT)
-        self.enabled_location_categories.add(DigimonWorldLocationCategory.CARD)
-        self.enabled_location_categories.add(DigimonWorldLocationCategory.CHEST)
+        if self.options.card_sanity.value:
+            self.enabled_location_categories.add(DigimonWorldLocationCategory.CARD)
+        if self.options.chest_sanity.value:
+            self.enabled_location_categories.add(DigimonWorldLocationCategory.CHEST)
+        if self.options.include_wild_digimon.value:
+            self.enabled_location_categories.add(DigimonWorldLocationCategory.DEFEATED)
         
 
 
@@ -73,7 +77,7 @@ class DigimonWorldWorld(World):
         regions.update({region_name: self.create_region(region_name, location_tables[region_name]) for region_name in [
             "Start Game","Consumable", "Cards",
             "Prosperity",
-            "Digimon", "Chests"
+            "Digimon", "Chests", "Wild Digimon"
         ]})
         
 
@@ -88,6 +92,7 @@ class DigimonWorldWorld(World):
         create_connection("Start Game", "Digimon") 
         create_connection("Start Game", "Prosperity") 
         create_connection("Start Game", "Chests") 
+        create_connection("Start Game", "Wild Digimon") 
 
 
         
@@ -265,6 +270,33 @@ class DigimonWorldWorld(World):
                 set_rule(card, lambda state, s=self: state.has("Digitamamon Soul", s.player) and calculate_prosperity(s, state) >= 50 and state.can_reach_location("Agumon", s.player))
                 continue
             set_rule(card, lambda state, s=self: (state.can_reach_location("Meramon", s.player) or calculate_prosperity(s, state) >= 6))
+
+        wild_digimon_rules = {
+            # Only found alongside Whamon's recruit chain / area
+            "PlatinumSukamon": lambda state, s=self: state.can_reach_location("Whamon", s.player),
+            "Guardromon": lambda state, s=self: state.can_reach_location("Whamon", s.player),
+            # Only encountered once Monzaemon has been recruited as a partner
+            "ToyAgumon": lambda state, s=self: state.has("Monzaemon Soul", s.player),
+            "ClearAgumon": lambda state, s=self: state.has("Monzaemon Soul", s.player),
+            "Tankmon": lambda state, s=self: state.has("Monzaemon Soul", s.player),
+            "WaruMonzaemon": lambda state, s=self: state.has("Monzaemon Soul", s.player),
+            # Ice Sanctuary requires a Vaccine partner to enter, same gate as Angemon's recruit
+            "Icemon": lambda state, s=self: state.can_reach_location("Angemon", s.player),
+            # Grey Lord's Mansion requires a Virus partner to enter, same gate as SkullGreymon's recruit
+            "Rockmon": lambda state, s=self: state.can_reach_location("SkullGreymon", s.player),
+            # Mt Infinity, same unlock condition as Devimon/Airdramon/MetalGreymon/Megadramon's recruitment
+            "Piddomon": lambda state, s=self: state.can_reach_location("Devimon", s.player),
+            # Ogremon #3 fight (which contains WaruSeadramon) requires Ogremon #1 and #2 to have been beaten first
+            "WaruSeadramon": lambda state, s=self: state.can_reach_location("Ogremon #1", s.player) and state.can_reach_location("Ogremon #2", s.player),
+            "Ogremon #1": lambda state, s=self: calculate_prosperity(s, state) >= 5,
+            "Ogremon #2": lambda state, s=self: state.can_reach_location("Ogremon #1", s.player),
+        }
+        for location_name, rule in wild_digimon_rules.items():
+            set_rule(self.multiworld.get_location(location_name, self.player), rule)
+        self.multiworld.register_indirect_condition(
+            self.multiworld.get_region("Digimon", self.player),
+            self.multiworld.get_entrance("Wild Digimon", self.player)
+        )
 
         set_rule(self.multiworld.get_location(f"1 Prosperity", self.player), lambda state, s=self: state.can_reach_location("Agumon", s.player))
         for prosperity_location in self.multiworld.get_locations(self.player):   
