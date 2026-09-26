@@ -3,6 +3,7 @@ using Archipelago.Core.AvaloniaGUI.Models;
 using Archipelago.Core.AvaloniaGUI.ViewModels;
 using Archipelago.Core.AvaloniaGUI.Views;
 using Archipelago.Core.Helpers;
+using Archipelago.Core.Json;
 using Archipelago.Core.Models;
 using Archipelago.Core.Util;
 using Archipelago.Core.Util.GPS;
@@ -54,6 +55,7 @@ public partial class App : Application
     // EnsureProsperity() for why these are sent manually instead of via
     // MonitorLocationsAsync.
     private static readonly HashSet<long> _completedProsperityLocationIds = new HashSet<long>();
+    private static readonly HashSet<long> _completedWildDigimonLocationIds = new HashSet<long>();
     public static int ExpMultiplier { get; set; }
     public static bool StatCapEnabled { get; set; }
     public static Randomiser RandomSettings { get; set; }
@@ -61,7 +63,20 @@ public partial class App : Application
     private static readonly object _lockObject = new object();
     private bool _fastDrimogemon = false;
     private bool _easyMonochromon = false;
+    private enum GoalMode { Prosperity, Digitamamon, BeatTheGame }
+    private GoalMode _goalMode = GoalMode.Prosperity;
+    private int _requiredProsperity = 100;
     private ILocation goalLocation;
+    // Only used in Beat-the-Game mode (goalSetting == 2). Reaching the
+    // chosen Prosperity threshold in-game unlocks the Machinedramon fight,
+    // but doesn't require actually winning it - "Beaten the game once
+    // already" (Cards & Triggers ID 50, 0x001bdfd3 bit 2) is set right
+    // after that fight is won, so goal completion in that mode requires
+    // both goalLocation (the prosperity threshold) AND this to be true.
+    private static readonly ILocation _machinedramonDefeatedLocation =
+        LocationJsonHelper.Instance.DeserializeLocations(
+            "[{\"Name\":\"Beaten The Game\",\"Id\":1,\"Address\":\"0x001bdfd3\",\"AddressBit\":2}]"
+        ).Single();
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -128,6 +143,28 @@ public partial class App : Application
         }
     }
 
+    private int GetMaxInventorySize()
+    {
+        // Base inventory is 10 unique item slots. "Unlocked Inventory Addon
+        // #1"/"#2" (Cards & Triggers ID 47/48) each add another 10, for up
+        // to 30 with both. The slot-index loops below previously stopped
+        // at a hardcoded 10 regardless of these flags, so anything past
+        // the base 10 slots was always sent to the item bank even when
+        // real in-game capacity was 20 or 30.
+        var maxSize = 10;
+        var addonOneFlags = Memory.ReadByte(Addresses.InventoryAddonOneUnlocked);
+        if ((addonOneFlags & 0x80) != 0) // bit 7
+        {
+            maxSize += 10;
+        }
+        var addonTwoFlags = Memory.ReadByte(Addresses.InventoryAddonTwoUnlocked);
+        if ((addonTwoFlags & 0x01) != 0) // bit 0
+        {
+            maxSize += 10;
+        }
+        return maxSize;
+    }
+
     private void AddSingleDigimonItem(int itemId)
     {
         var localId = itemId - 692000;
@@ -137,9 +174,9 @@ public partial class App : Application
             Log.Warning($"Received unknown consumable item id {itemId} (localId {localId}) - ignoring");
             return;
         }
-        var inventorySize = (int)Memory.ReadByte(Addresses.InventorySize);
+        var maxInventorySize = GetMaxInventorySize();
         //Get matching item pile in inventory
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < maxInventorySize; i++)
         {
             ulong slotAddress = (ulong)(0x0013D474 + i);
             ulong amountAddress = (ulong)(0x0013D492 + i);
@@ -175,8 +212,8 @@ public partial class App : Application
     }
     private Tuple<ulong, ulong> GetEmptyInventorySlot()
     {
-        var inventorySize = (ulong)Memory.ReadByte(Addresses.InventorySize);
-        for (int i = 0; i < 10; i++)
+        var maxInventorySize = GetMaxInventorySize();
+        for (int i = 0; i < maxInventorySize; i++)
         {
             ulong slotAddress = (ulong)(0x0013D474 + i);
             ulong amountAddress = (ulong)(0x0013D492 + i);
@@ -295,26 +332,54 @@ public partial class App : Application
             var goalSetting = Convert.ToInt32(options["goal"].ToString());
             if (goalSetting == 0)
             {
+                _goalMode = GoalMode.Prosperity;
                 if (options.ContainsKey("required_prosperity"))
                 {
                     var prosperityRequired = Convert.ToInt32(options["required_prosperity"].ToString());
+                    _requiredProsperity = prosperityRequired;
                     goalLocation = Helpers.GetProsperityLocations().Single(x => x.Name == $"{prosperityRequired} Prosperity");
                 }
-                else goalLocation = Helpers.GetProsperityLocations().Single(x => x.Name == "100 Prosperity");
+                else
+                {
+                    _requiredProsperity = 100;
+                    goalLocation = Helpers.GetProsperityLocations().Single(x => x.Name == "100 Prosperity");
+                }
             }
             else if (goalSetting == 1)
             {
+                _goalMode = GoalMode.Digitamamon;
                 goalLocation = Helpers.GetLocations().Single(x => x.Name == "Digitamamon");        
+            }
+            else if (goalSetting == 2)
+            {
+                _goalMode = GoalMode.BeatTheGame;
+                var prosperityRequired = options.ContainsKey("required_prosperity")
+                    ? Convert.ToInt32(options["required_prosperity"].ToString())
+                    : 100;
+                // Beating Machinedramon only ever needs the native
+                // 50-point requirement - a higher configured value is
+                // capped here to match the apworld's own
+                // completion_condition/mt_infinity_threshold, so there's
+                // no reason to grind further than what's actually needed
+                // to reach and beat him.
+                _requiredProsperity = Math.Min(50, prosperityRequired);
+                goalLocation = Helpers.GetProsperityLocations().Single(x => x.Name == $"{_requiredProsperity} Prosperity");
             }
         }
         else
         {
+            _goalMode = GoalMode.Prosperity;
             if (options.ContainsKey("required_prosperity"))
             {
                 var prosperityRequired = Convert.ToInt32(options["required_prosperity"].ToString());
+                _requiredProsperity = prosperityRequired;
                 goalLocation = Helpers.GetProsperityLocations().Single(x => x.Name == $"{prosperityRequired} Prosperity");
             }
-            else goalLocation = Helpers.GetProsperityLocations().Single(x => x.Name == "100 Prosperity");
+            else
+            {
+                _requiredProsperity = 100;
+                goalLocation = Helpers.GetProsperityLocations().Single(x => x.Name == "100 Prosperity");
+            }
         }
 
     }
@@ -458,11 +523,16 @@ public partial class App : Application
             RunStep("EnsureSouls", EnsureSouls);
             RunStep("EnsureWorldFlags", EnsureWorldFlags);
             RunStep("EnsureProsperity", EnsureProsperity);
+            RunStep("EnsureWildDigimonChecks", EnsureWildDigimonChecks);
+            RunStep("EnsureMtInfinityUnlock", EnsureMtInfinityUnlock);
             RunStep("ProcessReceivedItems", ProcessReceivedItems);
             RunStep("AddMoney", AddMoney);
             RunStep("AddDigimonItem", AddDigimonItem);
 
-            if (goalLocation?.Check() ?? false)
+            var goalReached = _goalMode == GoalMode.BeatTheGame
+                ? (goalLocation?.Check() ?? false) && _machinedramonDefeatedLocation.Check()
+                : (goalLocation?.Check() ?? false);
+            if (goalReached)
             {
                 Client.SendGoalCompletion();
             }
@@ -496,6 +566,29 @@ public partial class App : Application
             context, ex.GetType().FullName, ex.Message, ex.StackTrace);
     }
 
+    private void EnsureWildDigimonChecks()
+    {
+        // Deliberately NOT handed to MonitorLocationsAsync: two Wild Digimon
+        // "beaten" bits can flip true in the same fight (a mixed encounter),
+        // and the generic monitor only ever sent one of the two as a check
+        // when that happened - almost certainly because it tracks/dedupes
+        // by address rather than by address+bit, so two locations sharing
+        // one byte only get one check between them when both go true in
+        // the same poll. Polling and completing each one ourselves here,
+        // same pattern as EnsureProsperity, sidesteps that entirely - every
+        // location gets its own independent Check() and its own send.
+        foreach (var location in Helpers.GetWildDigimonLocations())
+        {
+            if (_completedWildDigimonLocationIds.Contains(location.Id))
+                continue;
+            if (location.Check())
+            {
+                Client.CurrentSession.Locations.CompleteLocationChecks(location.Id);
+                _completedWildDigimonLocationIds.Add(location.Id);
+            }
+        }
+    }
+
     private void EnsureProsperity()
     {
         var prosperity = Helpers.CalculateProsperityPoints(Client);
@@ -517,6 +610,27 @@ public partial class App : Application
                 Client.CurrentSession.Locations.CompleteLocationChecks(location.Id);
                 _completedProsperityLocationIds.Add(location.Id);
             }
+        }
+    }
+
+    private void EnsureMtInfinityUnlock()
+    {
+        // Mt. Infinity (and everything gated behind it - Devimon,
+        // Airdramon, MetalGreymon, Megadramon, Piddomon, and ultimately
+        // Machinedramon) only unlocks natively once real in-game Prosperity
+        // reaches 50. If the player's chosen Beat-the-Game threshold is
+        // lower than that, the goal would otherwise be impossible to
+        // complete without separately grinding past it. Only relevant in
+        // Beat-the-Game mode, and only below the native threshold - above
+        // 50 the area unlocks on its own regardless.
+        if (_goalMode != GoalMode.BeatTheGame || _requiredProsperity >= 50)
+        {
+            return;
+        }
+        var currentProsperity = Memory.ReadByte(Addresses.ProsperityPoints);
+        if (currentProsperity >= _requiredProsperity)
+        {
+            Memory.WriteBit(Addresses.MtInfinityUnlocked, 2, true);
         }
     }
 
@@ -601,6 +715,7 @@ public partial class App : Application
         // Resending an already-completed location is harmless (the server
         // just ignores it), so starting empty each connect is safe.
         _completedProsperityLocationIds.Clear();
+        _completedWildDigimonLocationIds.Clear();
 
         Helpers.DigimonTechniques = ReadTechniques();
 
@@ -617,7 +732,6 @@ public partial class App : Application
 
         var locations = Helpers.GetDigimonCards();
         locations.AddRange(Helpers.GetChests());
-        locations.AddRange(Helpers.GetWildDigimonLocations());
         // Prosperity locations are deliberately NOT included here. Their
         // Check() reads Addresses.ProsperityPoints directly, and the native
         // game writes to that address immediately and unconditionally the
@@ -628,6 +742,13 @@ public partial class App : Application
         // send a false completion before we ever overwrite it with the
         // correct value. Instead, EnsureProsperity() below sends prosperity
         // checks itself, driven only by our soul-gated calculation.
+        //
+        // Wild Digimon locations are also deliberately NOT included here -
+        // several share a single byte (multiple wild/glitch Digimon can be
+        // fought in the same encounter, each with its own bit in the same
+        // address), and MonitorLocationsAsync only ever sent one of them as
+        // a check when two flipped true in the same poll. EnsureWildDigimonChecks()
+        // below polls and completes each one individually instead.
         Client.LocationManager.EnableLocationsCondition = ()=> Helpers.IsInGame();
 
         Client.LocationManager.MonitorLocationsAsync(Client.CurrentSession, locations);

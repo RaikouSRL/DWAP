@@ -42,6 +42,9 @@ namespace DWAP
 
         public static ulong ChartStartAddress = 0x001be00d;
         public static ulong ProsperityPoints = 0x001BE032;
+        public static ulong MtInfinityUnlocked = 0x001BDFF9; // Cards & Triggers ID 354, bit 2
+        public static ulong InventoryAddonOneUnlocked = 0x001BDFD2; // Cards & Triggers ID 47, bit 7
+        public static ulong InventoryAddonTwoUnlocked = 0x001BDFD3; // Cards & Triggers ID 48, bit 0
 
         public static ulong RecruitmentFunctionAddress = 0x00000000;
     }
