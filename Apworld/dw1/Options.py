@@ -24,7 +24,7 @@ class GoalOption(Choice):
     """Sets the goal for the game"""
     display_name = "Goal"
     default = 0
-    option_prosperity = 0
+    option_beat_the_game = 0
     option_digitamamon = 1   
 
 class RequiredProsperityOption(Range):

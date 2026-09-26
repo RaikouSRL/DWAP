@@ -246,13 +246,41 @@ class DigimonWorldWorld(World):
                         if calculate_prosperity(world, state, d.name) < d.prosperity_requirement:
                             return False
                 elif d.prosperity_requirement > 1:
-                    if calculate_prosperity(world, state, d.name) < d.prosperity_requirement:
+                    # Devimon/Airdramon/MetalGreymon/Megadramon are all
+                    # gated behind Mt. Infinity, which the client force-
+                    # unlocks early (at the player's chosen Prosperity goal,
+                    # via EnsureMtInfinityUnlock) whenever that goal is set
+                    # below the native 50-point requirement. Mirror that
+                    # here so the logic matches what's actually reachable
+                    # in-game, rather than assuming the native 50 always
+                    # applies.
+                    effective_requirement = (
+                        mt_infinity_threshold(world) if d.name in mt_infinity_group
+                        else d.prosperity_requirement
+                    )
+                    if calculate_prosperity(world, state, d.name) < effective_requirement:
                         return False
                 return True
             return rule
 
+        mt_infinity_group = {"Devimon", "Airdramon", "MetalGreymon", "Megadramon"}
+
+        def mt_infinity_threshold(world):
+            if world.options.goal.value == 0:
+                return min(50, world.options.required_prosperity.value)
+            return 50
+
         if self.options.goal.value == 0:
-            self.multiworld.completion_condition[self.player] = lambda state: calculate_prosperity(self, state) >= self.options.required_prosperity.value
+            # Reaching the chosen Prosperity threshold only unlocks the
+            # Machinedramon fight (that's what "Machinedramon Card"'s own
+            # rule already encodes: Digitamamon Soul + native prosperity
+            # >= 50 + Agumon reachable) - it doesn't require actually
+            # winning it. Require both, so the goal matches the real
+            # ending rather than an arbitrary Prosperity count.
+            self.multiworld.completion_condition[self.player] = lambda state: (
+                calculate_prosperity(self, state) >= self.options.required_prosperity.value
+                and state.can_reach_location("Machinedramon Card", self.player)
+            )
         else:
             self.multiworld.completion_condition[self.player] = lambda state: state.can_reach_location("Digitamamon", self.player)
 
@@ -267,7 +295,7 @@ class DigimonWorldWorld(World):
 
         for card in [card for card in self.multiworld.get_locations(self.player) if card.category == DigimonWorldLocationCategory.CARD]:            
             if(card.name == "Machinedramon Card"):
-                set_rule(card, lambda state, s=self: state.has("Digitamamon Soul", s.player) and calculate_prosperity(s, state) >= 50 and state.can_reach_location("Agumon", s.player))
+                set_rule(card, lambda state, s=self: state.has("Digitamamon Soul", s.player) and calculate_prosperity(s, state) >= mt_infinity_threshold(s) and state.can_reach_location("Agumon", s.player))
                 continue
             set_rule(card, lambda state, s=self: (state.can_reach_location("Meramon", s.player) or calculate_prosperity(s, state) >= 6))
 
@@ -303,6 +331,26 @@ class DigimonWorldWorld(World):
             if prosperity_location.name.endswith("Prosperity"):                
                 prosperity_value = int(prosperity_location.name.split(" ")[0])                     
                 set_rule(prosperity_location, lambda state, pval=prosperity_value, s=self: calculate_prosperity(s, state) >= pval and state.can_reach_location("Agumon", s.player))
+
+        # In Prosperity-goal mode, the game can be (and is expected to be)
+        # completed the moment calculate_prosperity() reaches the chosen
+        # threshold - reaching any higher Prosperity value is never
+        # required to finish. Since these locations can still legitimately
+        # be reached before then (recruiting more Digimon than strictly
+        # needed for the goal is entirely possible), a progression or
+        # useful item can otherwise land past the goal and only ever be
+        # accessible in a playthrough that goes further than "beating the
+        # game" requires - which is exactly where you'd have no reason to
+        # keep playing. Restrict every "N Prosperity" location above the
+        # goal to filler only, so nothing another player actually needs
+        # ends up stranded there.
+        if self.options.goal.value == 0:
+            required_prosperity = self.options.required_prosperity.value
+            for prosperity_location in self.multiworld.get_locations(self.player):
+                if prosperity_location.name.endswith("Prosperity"):
+                    prosperity_value = int(prosperity_location.name.split(" ")[0])
+                    if prosperity_value > required_prosperity:
+                        add_item_rule(prosperity_location, lambda item: item.classification == ItemClassification.filler)
 
     def fill_slot_data(self) -> Dict[str, object]:
         slot_data: Dict[str, object] = {}

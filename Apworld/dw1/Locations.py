@@ -408,9 +408,9 @@ location_tables = {
         DigimonWorldLocationData(69060042, "Otamamon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
         DigimonWorldLocationData(69060044, "Tentomon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
         DigimonWorldLocationData(69060045, "WaruSeadramon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
+        DigimonWorldLocationData(69060046, "Meteormon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
         DigimonWorldLocationData(69060047, "Ogremon #1", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
         DigimonWorldLocationData(69060048, "Ogremon #2", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
-        DigimonWorldLocationData(69060046, "Meteormon", "1000 Bits", DigimonWorldLocationCategory.DEFEATED),
     ],
 }
 location_dictionary: Dict[str, DigimonWorldLocationData] = {}
