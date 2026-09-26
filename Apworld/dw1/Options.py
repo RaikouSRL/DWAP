@@ -21,11 +21,15 @@ class EnsureEarlyStatCapOption(DefaultOnToggle):
     display_name = "Ensure Early Stat Cap"    
 
 class GoalOption(Choice):
-    """Sets the goal for the game"""
+    """Sets the goal for the game
+    Prosperity = Win once the chosen Prosperity threshold is reached
+    Digitamamon = Win by recruiting Digitamamon
+    Beat the Game = Win by actually defeating Machinedramon"""
     display_name = "Goal"
     default = 0
-    option_beat_the_game = 0
-    option_digitamamon = 1   
+    option_prosperity = 0
+    option_digitamamon = 1
+    option_beat_the_game = 2
 
 class RequiredProsperityOption(Range):
     """Sets the required prosperity points to complete the game"""
