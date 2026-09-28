@@ -363,6 +363,32 @@ class DigimonWorldWorld(World):
                     if prosperity_value > effective_prosperity_goal:
                         add_item_rule(prosperity_location, lambda item: item.classification == ItemClassification.filler)
 
+        # In Beat-the-Game mode, Mt. Infinity and Back Dimension are the
+        # final stretch on the way to Machinedramon - reachability there is
+        # gated behind (and can be forced open early by) the Prosperity
+        # threshold, not behind actually having whatever's inside these
+        # chests. A progression/useful item placed there is only findable
+        # this late, which is either redundant (the goal's already in
+        # reach without it) or, worse, needed elsewhere by another player
+        # and stranded behind the final area. Restrict these chests to
+        # filler only, same reasoning as the Prosperity locations above.
+        if self.options.goal.value == 2:
+            for chest_location in self.multiworld.get_locations(self.player):
+                if chest_location.name.startswith("Chest ") and (
+                    chest_location.name.endswith("(Mt. Infinity)") or chest_location.name.endswith("(Back Dimension)")
+                ):
+                    add_item_rule(chest_location, lambda item: item.classification == ItemClassification.filler)
+
+        # These six recruits are all on the Mt. Infinity/Machinedramon side
+        # of the game in Beat-the-Game mode - same late-game reasoning as
+        # the chests above applies to what they hand out, so restrict them
+        # to filler only too.
+        if self.options.goal.value == 2:
+            late_game_recruits = {"Etemon", "Digitamamon", "Airdramon", "MetalGreymon", "Devimon", "Megadramon"}
+            for recruit_location in self.multiworld.get_locations(self.player):
+                if recruit_location.name in late_game_recruits:
+                    add_item_rule(recruit_location, lambda item: item.classification == ItemClassification.filler)
+
     def fill_slot_data(self) -> Dict[str, object]:
         slot_data: Dict[str, object] = {}
 
