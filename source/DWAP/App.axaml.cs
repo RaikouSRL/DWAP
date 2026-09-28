@@ -14,6 +14,8 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using DWAP.Models;
+using DWAP.ViewModels;
+using DWAP.Views;
 using Newtonsoft.Json;
 using ReactiveUI;
 using Serilog;
@@ -56,6 +58,10 @@ public partial class App : Application
     // MonitorLocationsAsync.
     private static readonly HashSet<long> _completedProsperityLocationIds = new HashSet<long>();
     private static readonly HashSet<long> _completedWildDigimonLocationIds = new HashSet<long>();
+    // Backs the "Recruitment Tracker" custom control (opened via the main
+    // window's "Open Custom Controls" button) - one row per recruitable
+    // Digimon, refreshed every tick by EnsureRecruitmentTracker().
+    private static RecruitmentTrackerViewModel _recruitmentTrackerViewModel;
     public static int ExpMultiplier { get; set; }
     public static bool StatCapEnabled { get; set; }
     public static Randomiser RandomSettings { get; set; }
@@ -124,6 +130,16 @@ public partial class App : Application
         Log.Information("Loading Souls");
         Helpers.DigimonSouls = Helpers.GetDigimonSouls();
         Helpers.DigimonItems = Helpers.GetConsumables();
+
+        var recruitableDigimonNames = Helpers.GetLocations().Select(x => x.Name);
+        var wildEncounterNames = Helpers.GetWildDigimonLocations()
+            .Select(x => (x.Name, Helpers.GetWildEncounterSpriteKey(x.Name)));
+        _recruitmentTrackerViewModel = new RecruitmentTrackerViewModel(recruitableDigimonNames, wildEncounterNames);
+        Context.CustomControlsWindow = new RecruitmentTrackerWindow
+        {
+            DataContext = _recruitmentTrackerViewModel
+        };
+
         Log.Information("Ready to connect!");
     }
     private void AddDigimonItem()
@@ -521,10 +537,13 @@ public partial class App : Application
             CurrentLocation = Helpers.GetCurrentLocation();
             RunStep("EnsureStatCap", EnsureStatCap);
             RunStep("EnsureSouls", EnsureSouls);
+            RunStep("EnsurePostGameSoulRecruits", EnsurePostGameSoulRecruits);
             RunStep("EnsureWorldFlags", EnsureWorldFlags);
             RunStep("EnsureProsperity", EnsureProsperity);
+            RunStep("EnsureKoda01VermilimonWorkaround", EnsureKoda01VermilimonWorkaround);
             RunStep("EnsureWildDigimonChecks", EnsureWildDigimonChecks);
             RunStep("EnsureMtInfinityUnlock", EnsureMtInfinityUnlock);
+            RunStep("EnsureRecruitmentTracker", EnsureRecruitmentTracker);
             RunStep("ProcessReceivedItems", ProcessReceivedItems);
             RunStep("AddMoney", AddMoney);
             RunStep("AddDigimonItem", AddDigimonItem);
@@ -618,16 +637,27 @@ public partial class App : Application
         // Mt. Infinity (and everything gated behind it - Devimon,
         // Airdramon, MetalGreymon, Megadramon, Piddomon, and ultimately
         // Machinedramon) only unlocks natively once real in-game Prosperity
-        // reaches 50. If the player's chosen Beat-the-Game threshold is
-        // lower than that, the goal would otherwise be impossible to
-        // complete without separately grinding past it. Only relevant in
-        // Beat-the-Game mode, and only below the native threshold - above
-        // 50 the area unlocks on its own regardless.
+        // reaches 50 - but the vanilla game also requires the player to
+        // already own the Greymon Soul at that point, which isn't
+        // guaranteed to be in logic/received yet in a randomised seed. So
+        // reaching native 50 Prosperity forces the unlock flag directly
+        // here, skipping that Soul requirement entirely, regardless of
+        // goal mode.
+        var currentProsperity = Memory.ReadByte(Addresses.ProsperityPoints);
+        if (currentProsperity >= 50)
+        {
+            Memory.WriteBit(Addresses.MtInfinityUnlocked, 2, true);
+            return;
+        }
+
+        // If the player's chosen Beat-the-Game threshold is lower than the
+        // native 50, force the same unlock early at that lowered value too,
+        // so the goal isn't impossible to complete without separately
+        // grinding past it. Only relevant in Beat-the-Game mode.
         if (_goalMode != GoalMode.BeatTheGame || _requiredProsperity >= 50)
         {
             return;
         }
-        var currentProsperity = Memory.ReadByte(Addresses.ProsperityPoints);
         if (currentProsperity >= _requiredProsperity)
         {
             Memory.WriteBit(Addresses.MtInfinityUnlocked, 2, true);
@@ -665,6 +695,114 @@ public partial class App : Application
 
             Memory.WriteBit(recruitLocation.Address, recruitLocation.AddressBit, false);
         }
+    }
+
+    // Once "Beaten The Game" (Cards & Triggers ID 50) is set, receiving one
+    // of these Souls afterwards is enough on its own to mark the matching
+    // Digimon as recruited directly - no need to re-climb Mt. Infinity and
+    // fight it again post-game. Devimon = ID 206, Airdramon = ID 207,
+    // MetalGreymon = ID 212 (all confirmed against Locations.json).
+    private static readonly string[] _postGamePardonedRecruits = { "Devimon", "Airdramon", "MetalGreymon" };
+
+    private void EnsurePostGameSoulRecruits()
+    {
+        // Before the game's been beaten, these still go through the normal
+        // recruit-then-Soul flow (EnsureSouls() above still reverts the
+        // recruit flag if the Soul isn't owned).
+        if (!_machinedramonDefeatedLocation.Check())
+        {
+            return;
+        }
+        var acquiredSoulNames = Helpers.GetAcquiredSouls(Client).Select(x => x.Name.Split(' ')[0]).ToHashSet();
+        var locations = Helpers.GetLocations();
+        foreach (var name in _postGamePardonedRecruits)
+        {
+            if (!acquiredSoulNames.Contains(name))
+            {
+                continue;
+            }
+            var recruitLocation = (Location)locations.FirstOrDefault(x => x.Name == name);
+            if (recruitLocation != null)
+            {
+                Memory.WriteBit(recruitLocation.Address, recruitLocation.AddressBit, true);
+            }
+        }
+    }
+
+    // Base-game bug: the wild encounter at map ID 80 (KODA01, "Entrance",
+    // Glacial Region) can spawn either Yanmamon or Vermilimon, but winning
+    // either fight always sets Yanmamon's "beaten" flag (0x001bdfee bit 3) -
+    // Vermilimon's own flag (0x001bdff1 bit 0) never gets written there, so
+    // its Wild Encounter check is otherwise unobtainable from that spawn.
+    // Since nothing in memory tells us which of the two was actually
+    // fought, we treat any fresh set of Yanmamon's flag while on map 80 as
+    // covering both: clear Yanmamon's flag the moment the player steps onto
+    // the map (a clean baseline for this visit, regardless of whether it
+    // was already true from a fight elsewhere), then if it flips back to
+    // true while still on the map, that's this map's encounter finishing -
+    // award Vermilimon's flag too and leave Yanmamon's true so its own
+    // check still sends normally via EnsureWildDigimonChecks(). Confirmed
+    // fine to clear an already-true Yanmamon flag: the only consequence is
+    // the AP check it already sent, which can't be un-sent anyway, and the
+    // game has no other logic hanging off that flag.
+    private const int Koda01MapId = 80;
+    private int _koda01PreviousMapId = -1;
+
+    private void EnsureKoda01VermilimonWorkaround()
+    {
+        var currentMapId = Helpers.GetCurrentLocation().MapId;
+        var locations = Helpers.GetWildDigimonLocations();
+        var yanmamonLocation = (Location)locations.FirstOrDefault(x => x.Name == "Yanmamon");
+        var vermilimonLocation = (Location)locations.FirstOrDefault(x => x.Name == "Vermilimon");
+        if (yanmamonLocation == null || vermilimonLocation == null)
+        {
+            _koda01PreviousMapId = currentMapId;
+            return;
+        }
+
+        var justEntered = currentMapId == Koda01MapId && _koda01PreviousMapId != Koda01MapId;
+        if (justEntered)
+        {
+            Memory.WriteBit(yanmamonLocation.Address, yanmamonLocation.AddressBit, false);
+        }
+        else if (currentMapId == Koda01MapId && yanmamonLocation.Check())
+        {
+            Memory.WriteBit(vermilimonLocation.Address, vermilimonLocation.AddressBit, true);
+        }
+
+        _koda01PreviousMapId = currentMapId;
+    }
+
+    private void EnsureRecruitmentTracker()
+    {
+        // Drives the "Recruitment Tracker" custom control window - both the
+        // Recruitments grid and the Wild Encounters grid. Recruited and
+        // Soul are tracked independently, same distinction EnsureSouls()
+        // relies on: the in-game recruit flag (Locations.json Check()) can
+        // briefly read true before its Soul item is actually owned, and
+        // EnsureSouls() reverts that - the tracker mirrors both states as
+        // they actually are rather than collapsing them into one.
+        if (_recruitmentTrackerViewModel == null)
+        {
+            return;
+        }
+        var locations = Helpers.GetLocations();
+        var acquiredSoulNames = Helpers.GetAcquiredSouls(Client).Select(x => x.Name.Split(' ')[0]).ToHashSet();
+        foreach (var entry in _recruitmentTrackerViewModel.Recruitments)
+        {
+            var recruitLocation = locations.FirstOrDefault(x => x.Name == entry.Name);
+            entry.IsRecruited = recruitLocation?.Check() ?? false;
+            entry.HasSoul = acquiredSoulNames.Contains(entry.Name);
+        }
+
+        var wildLocations = Helpers.GetWildDigimonLocations();
+        foreach (var entry in _recruitmentTrackerViewModel.WildEncounters)
+        {
+            var wildLocation = wildLocations.FirstOrDefault(x => x.Name == entry.Name);
+            entry.IsDefeated = wildLocation?.Check() ?? false;
+        }
+
+        _recruitmentTrackerViewModel.RefreshSummary();
     }
     public async Task Connect(ConnectClickedEventArgs args)
     {

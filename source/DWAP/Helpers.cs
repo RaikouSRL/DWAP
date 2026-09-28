@@ -346,6 +346,50 @@ namespace DWAP
                 return jsonFile;
             }
         }
+
+        // A few Wild Digimon locations don't map 1:1 to a species sprite -
+        // "Ogremon #1"/"Ogremon #2" are both just Ogremon encounters, so
+        // the Recruitment Tracker's Wild Encounters grid looks up the actual
+        // sprite file through this instead of assuming Name == sprite name.
+        // WaruSeadramon and Meteormon have their own darkened stand-in
+        // sprites (MegaSeadramon/Gotsumon, tinted) saved directly under
+        // Assets/DigimonSprites as WaruSeadramon.png/Meteormon.png, so they
+        // don't need an override - the default lookup finds them by name.
+        private static readonly Dictionary<string, string> WildEncounterSpriteKeyOverrides = new Dictionary<string, string>
+        {
+            { "Ogremon #1", "Ogremon" },
+            { "Ogremon #2", "Ogremon" },
+        };
+
+        public static string GetWildEncounterSpriteKey(string wildDigimonName)
+        {
+            if (WildEncounterSpriteKeyOverrides.TryGetValue(wildDigimonName, out var overrideKey))
+            {
+                return overrideKey;
+            }
+            return wildDigimonName;
+        }
+
+        // Loads a 16x16 pixel-art Digimon sprite from Assets/DigimonSprites
+        // for the Recruitment Tracker custom control. Returns null (not an
+        // exception) for a name with no sprite, so the tracker can still
+        // show that entry's status color without an image.
+        public static Avalonia.Media.IImage LoadDigimonSprite(string spriteName)
+        {
+            if (string.IsNullOrEmpty(spriteName))
+            {
+                return null;
+            }
+            var uri = new Uri($"avares://DWAP/Assets/DigimonSprites/{spriteName}.png");
+            if (!AssetLoader.Exists(uri))
+            {
+                return null;
+            }
+            using (Stream stream = AssetLoader.Open(uri))
+            {
+                return new Avalonia.Media.Imaging.Bitmap(stream);
+            }
+        }
         public static DigimonTechniqueData GetStarterMove(byte starter)
         {
             var stage = GetDigimonStage(starter);
