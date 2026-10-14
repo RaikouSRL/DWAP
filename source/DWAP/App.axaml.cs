@@ -827,11 +827,24 @@ public partial class App : Application
             entry.HasSoul = acquiredSoulNames.Contains(entry.Name);
         }
 
+        // Wild Encounters are "latching": once a square is green it stays
+        // green, even if the game later clears the underlying beaten flag
+        // (e.g. the Koda01 workaround, save reloads, or the game resetting
+        // encounter flags). A square is green if ANY of these hold: it was
+        // already green this session, the in-game flag is currently set, the
+        // check was already sent this session, or the Archipelago server
+        // already has the check recorded - the last one means the state also
+        // survives restarting the client / reconnecting.
         var wildLocations = Helpers.GetWildDigimonLocations();
+        var serverChecked = Client.CurrentSession.Locations.AllLocationsChecked.ToHashSet();
         foreach (var entry in _recruitmentTrackerViewModel.WildEncounters)
         {
             var wildLocation = wildLocations.FirstOrDefault(x => x.Name == entry.Name);
-            entry.IsDefeated = wildLocation?.Check() ?? false;
+            var latched = entry.IsDefeated;
+            var flagSet = wildLocation?.Check() ?? false;
+            var alreadySent = wildLocation != null
+                && (_completedWildDigimonLocationIds.Contains(wildLocation.Id) || serverChecked.Contains(wildLocation.Id));
+            entry.IsDefeated = latched || flagSet || alreadySent;
         }
 
         _recruitmentTrackerViewModel.RefreshSummary();
