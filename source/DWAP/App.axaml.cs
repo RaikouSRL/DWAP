@@ -538,6 +538,7 @@ public partial class App : Application
             RunStep("EnsureStatCap", EnsureStatCap);
             RunStep("EnsureSouls", EnsureSouls);
             RunStep("EnsurePostGameSoulRecruits", EnsurePostGameSoulRecruits);
+            RunStep("EnsureWhamonRecruitAfterSoul", EnsureWhamonRecruitAfterSoul);
             RunStep("EnsureWorldFlags", EnsureWorldFlags);
             RunStep("EnsureProsperity", EnsureProsperity);
             RunStep("EnsureKoda01VermilimonWorkaround", EnsureKoda01VermilimonWorkaround);
@@ -726,6 +727,37 @@ public partial class App : Application
             {
                 Memory.WriteBit(recruitLocation.Address, recruitLocation.AddressBit, true);
             }
+        }
+    }
+
+    // Whamon can only be recruited through the Ogremon #3 fight (the one
+    // that also contains WaruSeadramon). If the player wins that fight
+    // before the Whamon Soul has been received, EnsureSouls() reverts
+    // Whamon's recruit flag and there's no other way to earn it back -
+    // the fight is one-time and Whamon has no separate recruit route.
+    // So once the "WaruSeadramon beaten" flag is set AND the Whamon Soul
+    // is owned, mark Whamon as recruited directly. Requiring both keeps
+    // the Soul gate intact: nothing is granted until the Soul arrives, and
+    // nothing is granted if the fight hasn't actually been won.
+    private void EnsureWhamonRecruitAfterSoul()
+    {
+        var waruSeadramonLocation = (Location)Helpers.GetWildDigimonLocations()
+            .FirstOrDefault(x => x.Name == "WaruSeadramon");
+        if (waruSeadramonLocation == null || !waruSeadramonLocation.Check())
+        {
+            return;
+        }
+
+        var acquiredSoulNames = Helpers.GetAcquiredSouls(Client).Select(x => x.Name.Split(' ')[0]).ToHashSet();
+        if (!acquiredSoulNames.Contains("Whamon"))
+        {
+            return;
+        }
+
+        var whamonLocation = (Location)Helpers.GetLocations().FirstOrDefault(x => x.Name == "Whamon");
+        if (whamonLocation != null && !whamonLocation.Check())
+        {
+            Memory.WriteBit(whamonLocation.Address, whamonLocation.AddressBit, true);
         }
     }
 
