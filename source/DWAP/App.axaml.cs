@@ -539,6 +539,7 @@ public partial class App : Application
             RunStep("EnsureSouls", EnsureSouls);
             RunStep("EnsurePostGameSoulRecruits", EnsurePostGameSoulRecruits);
             RunStep("EnsureWhamonRecruitAfterSoul", EnsureWhamonRecruitAfterSoul);
+            RunStep("EnsureNanimonRecruitAfterSoul", EnsureNanimonRecruitAfterSoul);
             RunStep("EnsureWorldFlags", EnsureWorldFlags);
             RunStep("EnsureProsperity", EnsureProsperity);
             RunStep("EnsureKoda01VermilimonWorkaround", EnsureKoda01VermilimonWorkaround);
@@ -758,6 +759,36 @@ public partial class App : Application
         if (whamonLocation != null && !whamonLocation.Check())
         {
             Memory.WriteBit(whamonLocation.Address, whamonLocation.AddressBit, true);
+        }
+    }
+
+    // Nanimon is recruited by visiting five different spots, with the fifth
+    // one doing the actual recruit. If that last visit happens before the
+    // Nanimon Soul is owned, EnsureSouls() reverts the recruit flag and the
+    // game won't let the player trigger the final spot again, soft-locking
+    // him. The quest progress byte at 0x1BE046 reaches 5 once all five spots
+    // are done, so once it's >= 5 AND the Soul is owned, mark Nanimon as
+    // recruited directly. Requiring the Soul keeps the Soul gate intact.
+    private const byte NanimonQuestCompleteValue = 5;
+
+    private void EnsureNanimonRecruitAfterSoul()
+    {
+        var progress = Memory.ReadByte(Addresses.NanimonQuestProgress);
+        if (progress < NanimonQuestCompleteValue)
+        {
+            return;
+        }
+
+        var acquiredSoulNames = Helpers.GetAcquiredSouls(Client).Select(x => x.Name.Split(' ')[0]).ToHashSet();
+        if (!acquiredSoulNames.Contains("Nanimon"))
+        {
+            return;
+        }
+
+        var nanimonLocation = (Location)Helpers.GetLocations().FirstOrDefault(x => x.Name == "Nanimon");
+        if (nanimonLocation != null && !nanimonLocation.Check())
+        {
+            Memory.WriteBit(nanimonLocation.Address, nanimonLocation.AddressBit, true);
         }
     }
 

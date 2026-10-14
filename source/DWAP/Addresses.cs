@@ -37,6 +37,9 @@ namespace DWAP
         public static ulong MeramonTunnel_State = 0x001BE043;
         public static ulong MeramonTunnel_DrimogemonState = 0x001BE042;
         public static ulong MeramonTunnel_DiggingState = 0x001BE04F;
+        // Nanimon's recruit quest progress counter - reaches 5 once all five
+        // spots have been visited.
+        public static ulong NanimonQuestProgress = 0x001BE046;
 
         public static ulong CardStartAddress = 0x001bdfac;
 
